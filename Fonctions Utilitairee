@@ -1,0 +1,34 @@
+// Récupère le Data Owner d’un actif
+def getDataOwner(assetId) {
+    def asset = dgcRestClient.get("/assets/$assetId") // Requête API pour récupérer l’actif
+    return asset?.dataOwner ?: 'default.owner@company.com' // Retourne le Data Owner ou une valeur par défaut
+}
+
+// Récupère le Data Manager d’un actif pour l’escalation
+def getDataManager(assetId) {
+    def asset = dgcRestClient.get("/assets/$assetId")
+    return asset?.dataManager ?: 'default.manager@company.com'
+}
+
+// Récupère l’utilisateur qui a soumis la demande
+def getRequester(assetId) {
+    def asset = dgcRestClient.get("/assets/$assetId")
+    return asset?.requester ?: 'unknown.requester@company.com'
+}
+
+// Met à jour le statut de l’actif dans Collibra
+def updateAssetStatus(assetId, newStatus) {
+    def payload = [status: newStatus] as Map
+    dgcRestClient.put("/assets/$assetId", payload)
+}
+
+// Envoie une notification par email et via Collibra
+def sendNotification(userEmail, message) {
+    def notificationPayload = [
+        recipient: userEmail,
+        subject: "Notification Workflow Collibra",
+        body: message
+    ] as Map
+
+    dgcRestClient.post("/notifications", notificationPayload)
+}
