@@ -1,0 +1,85 @@
+// Importation des classes nécessaires
+import com.collibra.dgc.workflow.api.*
+
+// Définition du workflow
+workflow('Approval Process') {
+
+    // Étape 1 : Soumission de la demande par l'utilisateur
+    start {
+        task('Submit Request') {
+            action('Submit') { execution ->
+                def assetId = execution.getVariable('assetId') // Récupération de l'ID de l'actif
+                def requester = execution.getVariable('requester') // Récupération de l'initiateur
+                
+                // Notification au Data Owner pour approbation
+                def dataOwner = getDataOwner(assetId)
+                sendNotification(dataOwner, "Nouvelle demande d'approbation pour l'actif : $assetId")
+
+                // Enregistrement de la demande
+                execution.setVariable('status', 'Pending Approval')
+            }
+        }
+    }
+
+    // Étape 2 : Validation ou rejet par le Data Owner
+    userTask('Approval by Data Owner') {
+        assignee { execution -> getDataOwner(execution.getVariable('assetId')) }
+        
+        action('Approve') { execution ->
+            def assetId = execution.getVariable('assetId')
+            updateAssetStatus(assetId, 'Approved')
+            execution.setVariable('status', 'Approved')
+            sendNotification(getRequester(assetId), "Votre demande d'approbation a été acceptée.")
+        }
+        
+        action('Reject') { execution ->
+            def assetId = execution.getVariable('assetId')
+            updateAssetStatus(assetId, 'Rejected')
+            execution.setVariable('status', 'Rejected')
+            sendNotification(getRequester(assetId), "Votre demande d'approbation a été refusée.")
+        }
+
+        action('Request Changes') { execution ->
+            execution.setVariable('status', 'Modification Requested')
+            sendNotification(getRequester(execution.getVariable('assetId')), "Des modifications sont requises.")
+        }
+    }
+
+    // Étape 3 : Escalation en cas d'inaction
+    timerEvent(duration: 'P3D') { // Délai de 3 jours avant escalade
+        condition { execution -> execution.getVariable('status') == 'Pending Approval' }
+        action { execution ->
+            def manager = getDataManager(execution.getVariable('assetId'))
+            sendNotification(manager, "Escalation : aucune action sur la demande après 3 jours.")
+            execution.setVariable('status', 'Escalated')
+        }
+    }
+
+    // Étape 4 : Validation finale après escalade
+    userTask('Approval by Data Manager') {
+        condition { execution -> execution.getVariable('status') == 'Escalated' }
+        assignee { execution -> getDataManager(execution.getVariable('assetId')) }
+
+        action('Approve') { execution ->
+            updateAssetStatus(execution.getVariable('assetId'), 'Approved')
+            execution.setVariable('status', 'Approved')
+        }
+
+        action('Reject') { execution ->
+            updateAssetStatus(execution.getVariable('assetId'), 'Rejected')
+            execution.setVariable('status', 'Rejected')
+        }
+    }
+
+    // Fin du workflow
+    end {
+        action { execution ->
+            sendNotification(getRequester(execution.getVariable('assetId')), "Le processus d'approbation est terminé.")
+        }
+    }
+}
+
+// --- Fonctions utilitaires --- //
+
+// Récupère le Data Owner d’un actif
+def getDataOwner(assetId
