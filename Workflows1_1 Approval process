@@ -82,4 +82,4 @@ workflow('Approval Process') {
 // --- Fonctions utilitaires --- //
 
 // Récupère le Data Owner d’un actif
-def getDataOwner(assetId
+
