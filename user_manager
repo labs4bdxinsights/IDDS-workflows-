@@ -10,7 +10,7 @@ def startUserEmail = user.getEmailAddress()
 execution.setVariable("startUserEmail", startUserEmail)
 execution.setVariable("initiatorUserName", initiatorUserName)
 
-// 2. Identifier les responsables Data Owner Bis à partir de leur rôle
+// 2. Identifier les Data Owner Bis
 def rolesIdDO = [string2Uuid(dataOwnerBisUuid)]
 def findResponsibilitiesRequestDO = FindResponsibilitiesRequest.builder()
     .roleIds(rolesIdDO)
@@ -18,26 +18,44 @@ def findResponsibilitiesRequestDO = FindResponsibilitiesRequest.builder()
     .build()
 
 def ownerListDO = responsibilityApi.findResponsibilities(findResponsibilitiesRequestDO).getResults()*.getOwner()
-
 def DataOwnerBis = []
 
-// 3. Traiter les résultats et formater la liste
 ownerListDO.each { currentItem ->
-    loggerApi.info("${currentItem} OWNER CURRENT ITEM")
-    
     if (currentItem.getResourceType() == ResourceType.UserGroup) {
         DataOwnerBis.add("group(${userGroupApi.getUserGroup(currentItem.getId()).getUserName()})")
     } else {
         DataOwnerBis.add("user(${userApi.getUser(currentItem.getId()).getUserName()})")
     }
 }
-
-// 4. Stocker les variables dans le contexte du workflow
 execution.setVariable("DataOwnerBis", utility.toCsv(DataOwnerBis))
 
-// 5. Extraire l'email du premier utilisateur si présent (et non un groupe)
-def username_DO = DataOwnerBis[0].replaceAll(/user\(|\)/, "")
+def username_DO = DataOwnerBis[0].replaceAll(/user\\(|\\)/, "")
 def user_DO = userApi.findUsers(FindUsersRequest.builder()
                              .name(username_DO).build()).getResults().first()
 def DataOwnerBisEmail = user_DO.getEmailAddress()
 execution.setVariable("DataOwnerBisEmail", DataOwnerBisEmail)
+
+// 3. Identifier les Data Steward Bis
+def rolesIdDS = [string2Uuid(dataStewardBisUuid)]
+def findResponsibilitiesRequestDS = FindResponsibilitiesRequest.builder()
+    .roleIds(rolesIdDS)
+    .resourceIds([relatedAssetId])
+    .build()
+
+def ownerListDS = responsibilityApi.findResponsibilities(findResponsibilitiesRequestDS).getResults()*.getOwner()
+def DataStewardBis = []
+
+ownerListDS.each { currentItem ->
+    if (currentItem.getResourceType() == ResourceType.UserGroup) {
+        DataStewardBis.add("group(${userGroupApi.getUserGroup(currentItem.getId()).getUserName()})")
+    } else {
+        DataStewardBis.add("user(${userApi.getUser(currentItem.getId()).getUserName()})")
+    }
+}
+execution.setVariable("DataStewardBis", utility.toCsv(DataStewardBis))
+
+def username_DS = DataStewardBis[0].replaceAll(/user\\(|\\)/, "")
+def user_DS = userApi.findUsers(FindUsersRequest.builder()
+                             .name(username_DS).build()).getResults().first()
+def DataStewardBisEmail = user_DS.getEmailAddress()
+execution.setVariable("DataStewardBisEmail", DataStewardBisEmail)
